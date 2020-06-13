@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { View, Text, Image, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native'
 import Feather from "react-native-feather1s"
 import { useNavigation } from '@react-navigation/native'
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { BleManager } from 'react-native-ble-plx'
-import firebase from 'firebase'
 import base64 from 'react-native-base64'
 
 import logoImg from '../../assets/logo.png'
@@ -24,21 +23,103 @@ export default function Process() {
     const [pumpState, setPumpState] = useState(false)
 
     const [processTime, setProcessTime] = useState(0)
+    const [actualRamp, setActualRamp] = useState(0)
+    const [senseValue, setSenseValue] = useState(0)
 
     const manager = new BleManager
 
-    /*
-    useEffect(() => {
+    
+    function monitoringSerial() {
         manager.monitorCharacteristicForDevice(deviceID, serviceID, characteristicID, (err, rxSerial) => {
             if(err) {
 
             } else {
-                console.log(rxSerial.value)
-                setReceive(rxSerial.value)
+                const decodedCommand = base64.decode(rxSerial.value)
+                setReceive(decodedCommand)
+
+                const commandArray = decodedCommand.split('|')
+                console.log(commandArray)
+
+                if(commandArray[0] == "MASH" && commandArray[1] != "SET") {
+                    setProcessState(0)
+
+                    setProcessTime(Number(commandArray[1]))
+                    setActualRamp(Number(commandArray[2]))
+                    setSenseValue(Number(commandArray[3]))
+
+                    commandArray[4] == "1" ? setResistanceState(true) : setResistanceState(false)
+                    commandArray[5] == "1" ? setMixerState(true) : setMixerState(false)
+                    commandArray[6] == "1" ? setPumpState(true) : setPumpState(false)
+                    
+                }
+                else if (commandArray[0] == "MASH" && commandArray[1] == "SET") setProcessState(1)
+                else if (commandArray[0] == "BOIL" && commandArray[1] != "SET") {
+                    setProcessState(2)
+                    setProcessTime(Number(commandArray[1]))
+
+                    commandArray[2] == "1" ? setResistanceState(true) : setResistanceState(false)
+                    commandArray[3] == "1" ? setMixerState(true) : setMixerState(false)
+                    commandArray[4] == "1" ? setPumpState(true) : setMixerState(false)
+                }
+                else if (commandArray[0] == "BOIL" && commandArray[1] == "SET") setProcessState(3)
             }
         })
-    }, [])
+    }
+
+    /*
+    async function togglePump() {
+        manager.cancelTransaction('LISTEN')
+        if (pumpState) {
+            const command = base64.encode(`CMD|PMP|OFF`)
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)
+        }
+        else {
+            const command = base64.encode(`CMD|PMP|ON`) 
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)  
+        }  
+
+        setTimeout(() => monitoringSerial(), 2000)
+    }
+
+    async function toggleMixer() {
+        manager.cancelTransaction('LISTEN')
+        if (pumpState) {
+            const command = base64.encode(`CMD|MIX|OFF`)
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)
+        }
+        else {
+            const command = base64.encode(`CMD|MIX|ON`) 
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)  
+        }  
+
+        setTimeout(() => monitoringSerial(), 2000)
+    }
+
+    async function toggleResistance() {
+        manager.cancelTransaction('LISTEN')
+        if (pumpState) {
+            const command = base64.encode(`CMD|MIX|RES`)
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)
+        }
+        else {
+            const command = base64.encode(`CMD|RES|ON`) 
+            manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)  
+        }  
+
+        setTimeout(() => monitoringSerial(), 2000)
+    }
+
+    function showdeatails() {
+        manager.cancelTransaction('LISTEN')
+        const command = base64.encode(`BOIL|START`)
+        manager.writeCharacteristicWithoutResponseForDevice(deviceID, serviceID, characteristicID, command)
+        setTimeout(() => monitoringSerial(), 2000)
+    }
     */
+
+    useEffect(() => {
+        monitoringSerial()
+    }, [])
 
     return (
         <View style={styles.container}>
@@ -83,11 +164,11 @@ export default function Process() {
                         <Text style={styles.paramsTitle}>Temperatura</Text>
                         <View style={styles.row}>
                             <Text style={styles.paramsText}>Sensor : </Text>
-                            <Text style={styles.paramsText}>{processTime} ºC</Text>
+                            <Text style={styles.paramsText}>{senseValue} ºC</Text>
                         </View>
                         <View style={styles.row}>
                             <Text style={styles.paramsText}>Rampa : </Text>
-                            <Text style={styles.paramsText}>{processTime} ºC</Text>
+                            <Text style={styles.paramsText}>{actualRamp} ºC</Text>
                         </View>
                     </View>
                 </View>
@@ -152,6 +233,12 @@ export default function Process() {
                     onPress={() => {}}
                 >
                     <Text style={styles.actionText}>Desliga Resistência</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.action}
+                    onPress={showdeatails}
+                >
+                    <Text style={styles.actionText}>Show Details</Text>
                 </TouchableOpacity>
             </View>}
 
